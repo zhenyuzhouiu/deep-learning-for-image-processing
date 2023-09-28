@@ -49,9 +49,9 @@ def read_split_data(root: str, val_rate: float = 0.2):
             if img_path in val_path:  # 如果该路径在采样的验证集样本中则存入验证集
                 val_images_path.append(img_path)
                 val_images_label.append(image_class)
-            else:  # 否则存入训练集
-                train_images_path.append(img_path)
-                train_images_label.append(image_class)
+            # 存入训练集
+            train_images_path.append(img_path)
+            train_images_label.append(image_class)
 
     print("{} images were found in the dataset.".format(sum(every_class_num)))
     print("{} images for training.".format(len(train_images_path)))
@@ -96,7 +96,7 @@ def plot_data_loader_image(data_loader):
             # 反Normalize操作
             img = (img * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]) * 255
             label = labels[i].item()
-            plt.subplot(1, plot_num, i+1)
+            plt.subplot(1, plot_num, i + 1)
             plt.xlabel(class_indices[str(label)])
             plt.xticks([])  # 去掉x轴的刻度
             plt.yticks([])  # 去掉y轴的刻度
@@ -119,7 +119,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch):
     model.train()
     loss_function = torch.nn.CrossEntropyLoss()
     accu_loss = torch.zeros(1).to(device)  # 累计损失
-    accu_num = torch.zeros(1).to(device)   # 累计预测正确的样本数
+    accu_num = torch.zeros(1).to(device)  # 累计预测正确的样本数
     optimizer.zero_grad()
 
     sample_num = 0
@@ -156,7 +156,7 @@ def evaluate(model, data_loader, device, epoch):
 
     model.eval()
 
-    accu_num = torch.zeros(1).to(device)   # 累计预测正确的样本数
+    accu_num = torch.zeros(1).to(device)  # 累计预测正确的样本数
     accu_loss = torch.zeros(1).to(device)  # 累计损失
 
     sample_num = 0

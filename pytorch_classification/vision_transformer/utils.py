@@ -49,9 +49,9 @@ def read_split_data(root: str, val_rate: float = 0.2):
             if img_path in val_path:  # 如果该路径在采样的验证集样本中则存入验证集
                 val_images_path.append(img_path)
                 val_images_label.append(image_class)
-            else:  # 否则存入训练集
-                train_images_path.append(img_path)
-                train_images_label.append(image_class)
+            # 存入训练集
+            train_images_path.append(img_path)
+            train_images_label.append(image_class)
 
     print("{} images were found in the dataset.".format(sum(every_class_num)))
     print("{} images for training.".format(len(train_images_path)))

@@ -8,7 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 import torch.optim.lr_scheduler as lr_scheduler
 
-from model import efficientnetv2_s as create_model
+# from model import efficientnetv2_s as create_model
+from model import efficientnetv2_m as create_model
 from my_dataset import MyDataSet
 from utils import read_split_data, train_one_epoch, evaluate
 
@@ -22,17 +23,21 @@ def main(args):
     if os.path.exists("./weights") is False:
         os.makedirs("./weights")
 
-    train_images_path, train_images_label, val_images_path, val_images_label = read_split_data(args.data_path)
+    train_images_path, train_images_label, val_images_path, val_images_label = read_split_data(args.data_path,
+                                                                                               args.val_rate)
 
     img_size = {"s": [300, 384],  # train_size, val_size
                 "m": [384, 480],
                 "l": [384, 480]}
-    num_model = "s"
+    num_model = "m"
 
     data_transform = {
         "train": transforms.Compose([transforms.RandomResizedCrop(img_size[num_model][0]),
                                      transforms.RandomHorizontalFlip(),
+                                     transforms.RandomPerspective(),
+                                     transforms.RandomGrayscale(),
                                      transforms.ToTensor(),
+                                     transforms.RandomErasing(),
                                      transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])]),
         "val": transforms.Compose([transforms.Resize(img_size[num_model][1]),
                                    transforms.CenterCrop(img_size[num_model][1]),
@@ -115,28 +120,41 @@ def main(args):
         tb_writer.add_scalar(tags[3], val_acc, epoch)
         tb_writer.add_scalar(tags[4], optimizer.param_groups[0]["lr"], epoch)
 
-        torch.save(model.state_dict(), "./weights/model-{}.pth".format(epoch))
+        torch.save(model.state_dict(), "./weights/last.pth")
+        current_loss = (train_loss + val_loss) / 2
+        current_acc = (train_acc + val_acc) / 2
+        if epoch == 0:
+            best_loss = current_loss
+            best_acc = current_acc
+            torch.save(model.state_dict(), "./weights/best.pth")
+        else:
+            if current_loss < best_loss and current_acc > best_acc:
+                best_loss = current_loss
+                best_acc = current_acc
+                torch.save(model.state_dict(), "./weights/best.pth")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_classes', type=int, default=5)
-    parser.add_argument('--epochs', type=int, default=30)
-    parser.add_argument('--batch-size', type=int, default=8)
+    parser.add_argument('--num_classes', type=int, default=1424)
+    parser.add_argument('--epochs', type=int, default=3000)
+    parser.add_argument('--batch-size', type=int, default=2)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--lrf', type=float, default=0.01)
 
     # 数据集所在根目录
     # https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz
     parser.add_argument('--data-path', type=str,
-                        default="/data/flower_photos")
+                        default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/train/")
+    parser.add_argument('--val_rate', type=float,
+                        default=0.2)
 
     # download model weights
     # 链接: https://pan.baidu.com/s/1uZX36rvrfEss-JGj4yfzbQ  密码: 5gu1
-    parser.add_argument('--weights', type=str, default='./pre_efficientnetv2-s.pth',
+    parser.add_argument('--weights', type=str, default='./torch_efficientnetv2/pre_efficientnetv2-m.pth',
                         help='initial weights path')
-    parser.add_argument('--freeze-layers', type=bool, default=True)
-    parser.add_argument('--device', default='cuda:0', help='device id (i.e. 0 or 0,1 or cpu)')
+    parser.add_argument('--freeze-layers', type=bool, default=False)
+    parser.add_argument('--device', default='cuda:1', help='device id (i.e. 0 or 0,1 or cpu)')
 
     opt = parser.parse_args()
 

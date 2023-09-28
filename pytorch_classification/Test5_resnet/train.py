@@ -8,25 +8,30 @@ import torch.optim as optim
 from torchvision import transforms, datasets
 from tqdm import tqdm
 
-from model import resnet34
+# from model import resnet34
+from model import resnet50
 
 
 def main():
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
 
     data_transform = {
         "train": transforms.Compose([transforms.RandomResizedCrop(224),
                                      transforms.RandomHorizontalFlip(),
+                                     transforms.RandomGrayscale(),
+                                     transforms.RandomPerspective(),
                                      transforms.ToTensor(),
+                                     transforms.RandomErasing(),
                                      transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
         "val": transforms.Compose([transforms.Resize(256),
                                    transforms.CenterCrop(224),
                                    transforms.ToTensor(),
                                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])}
 
-    data_root = os.path.abspath(os.path.join(os.getcwd(), "../.."))  # get data root path
-    image_path = os.path.join(data_root, "data_set", "flower_data")  # flower data set path
+    # data_root = os.path.abspath(os.path.join(os.getcwd(), "../.."))  # get data root path
+    # image_path = os.path.join(data_root, "data_set", "flower_data")  # flower data set path
+    image_path = "/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/"
     assert os.path.exists(image_path), "{} path does not exist.".format(image_path)
     train_dataset = datasets.ImageFolder(root=os.path.join(image_path, "train"),
                                          transform=data_transform["train"])
@@ -40,7 +45,7 @@ def main():
     with open('class_indices.json', 'w') as json_file:
         json_file.write(json_str)
 
-    batch_size = 16
+    batch_size = 48
     nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])  # number of workers
     print('Using {} dataloader workers every process'.format(nw))
 
@@ -48,7 +53,7 @@ def main():
                                                batch_size=batch_size, shuffle=True,
                                                num_workers=nw)
 
-    validate_dataset = datasets.ImageFolder(root=os.path.join(image_path, "val"),
+    validate_dataset = datasets.ImageFolder(root=os.path.join(image_path, "train"),
                                             transform=data_transform["val"])
     val_num = len(validate_dataset)
     validate_loader = torch.utils.data.DataLoader(validate_dataset,
@@ -58,10 +63,10 @@ def main():
     print("using {} images for training, {} images for validation.".format(train_num,
                                                                            val_num))
     
-    net = resnet34()
+    net = resnet50()
     # load pretrain weights
     # download url: https://download.pytorch.org/models/resnet34-333f7ec4.pth
-    model_weight_path = "./resnet34-pre.pth"
+    model_weight_path = "./pre-trained/resnet50-19c8e357.pth"
     assert os.path.exists(model_weight_path), "file {} does not exist.".format(model_weight_path)
     net.load_state_dict(torch.load(model_weight_path, map_location='cpu'))
     # for param in net.parameters():
@@ -69,7 +74,7 @@ def main():
 
     # change fc layer structure
     in_channel = net.fc.in_features
-    net.fc = nn.Linear(in_channel, 5)
+    net.fc = nn.Linear(in_channel, 1424)
     net.to(device)
 
     # define loss function
@@ -79,9 +84,11 @@ def main():
     params = [p for p in net.parameters() if p.requires_grad]
     optimizer = optim.Adam(params, lr=0.0001)
 
-    epochs = 3
+    epochs = 3000
     best_acc = 0.0
-    save_path = './resNet34.pth'
+    save_path = './weights'
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
     train_steps = len(train_loader)
     for epoch in range(epochs):
         # train
@@ -124,7 +131,7 @@ def main():
 
         if val_accurate > best_acc:
             best_acc = val_accurate
-            torch.save(net.state_dict(), save_path)
+            torch.save(net.state_dict(), os.path.join(save_path, "resNet50.pth"))
 
     print('Finished Training')
 

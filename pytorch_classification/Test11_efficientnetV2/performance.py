@@ -9,7 +9,7 @@ from tqdm import tqdm
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from my_dataset import MyDataSetTest
-from vit_model import vit_base_patch16_224_in21k as create_model
+from model import efficientnetv2_m as create_model
 
 import os
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', type=str,
                         default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/R3",
                         help='the data source path')
-    parser.add_argument('--image_size', type=int, nargs='+', default=[224, 224],
+    parser.add_argument('--image_size', type=int, nargs='+', default=[384, 480],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')
     parser.add_argument("--batch_size", type=int, dest="batch_size", default=32)
     parser.add_argument("--num_workers", type=int, dest="num_workers", default=8)

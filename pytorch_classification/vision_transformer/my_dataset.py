@@ -104,6 +104,9 @@ class MyDataSetTest(Dataset):
             image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
             label = 0.0
 
+        if self.transform is not None:
+            image = self.transform(image)
+
         return image, label
 
     def data_info(self):

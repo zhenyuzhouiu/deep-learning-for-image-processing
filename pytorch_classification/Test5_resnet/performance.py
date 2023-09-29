@@ -9,7 +9,7 @@ from tqdm import tqdm
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from my_dataset import MyDataSetTest
-from model import efficientnetv2_m as create_model
+from model import resnet50
 
 import os
 
@@ -114,9 +114,13 @@ def main(args, out_dir):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
     # load model
-    model = create_model(num_classes=args.num_classes).to(device)
-    model = load(model, os.path.join(args.finetuning, "best.pth"), device, if_train=False)
-    print("Loaded pretrained EfficientNetv2 model")
+    model = resnet50()
+    # change fc layer structure
+    in_channel = model.fc.in_features
+    model.fc = torch.nn.Linear(in_channel, args.num_classes)
+    model = model.to(device)
+    model = load(model, os.path.join(args.finetuning, "resNet50.pth"), device, if_train=False)
+    print("Loaded pretrained ResNet50 model")
 
     # index
     tar, far = None, None
@@ -154,9 +158,9 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', type=str,
                         default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/R3",
                         help='the data source path')
-    parser.add_argument('--image_size', type=int, nargs='+', default=[384, 480],
+    parser.add_argument('--image_size', type=int, nargs='+', default=[224, 224],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')
-    parser.add_argument("--batch_size", type=int, dest="batch_size", default=32)
+    parser.add_argument("--batch_size", type=int, dest="batch_size", default=128)
     parser.add_argument("--num_workers", type=int, dest="num_workers", default=8)
     parser.add_argument("--device", type=str, dest="device", default="cuda:1",
                         help="cuda device 0 or 1, or cpu")

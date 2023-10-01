@@ -81,8 +81,9 @@ def main():
     loss_function = nn.CrossEntropyLoss()
 
     # construct an optimizer
-    params = [p for p in net.parameters() if p.requires_grad]
-    optimizer = optim.Adam(params, lr=0.0001)
+    # params = [p for p in net.parameters() if p.requires_grad]
+    # optimizer = optim.Adam(params, lr=0.0001)
+    optimizer = optim.SGD(net.parameters(), lr=0.001)
 
     epochs = 3000
     best_acc = 0.0

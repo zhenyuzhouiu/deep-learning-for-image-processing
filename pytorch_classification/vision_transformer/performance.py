@@ -1,17 +1,19 @@
-import os.path
-import torch
-import numpy as np
 import argparse
+import os
+import os.path
+
 import matplotlib
 import matplotlib.pyplot as plt
-
-from tqdm import tqdm
-from torchvision import transforms
+import numpy as np
+import scipy.interpolate
+import scipy.optimize
+import torch
 from torch.utils.data import DataLoader
+from torchvision import transforms
+from tqdm import tqdm
+
 from my_dataset import MyDataSetTest
 from vit_model import vit_base_patch16_224_in21k as create_model
-
-import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -68,7 +70,7 @@ def matching_scores(args, model, test_loader, probe_sample, device):
     return g_scores, i_scores
 
 
-def tar_far_n(g_socres, i_scores, step=500):
+def tar_far_n(g_socres, i_scores, step=1000):
     # from the difference correspondence graph network DCGNet, the similarity score
     tar, far = [], []
     n_g, n_i = g_socres.shape[0], i_scores.shape[0]
@@ -81,13 +83,18 @@ def tar_far_n(g_socres, i_scores, step=500):
     return tar, far
 
 
-def draw_roc(tar, far, eer, out_dir):
+def draw_roc(tar, far, eer, out_dir, label):
     matplotlib.rc('xtick', labelsize=10)
     matplotlib.rc('ytick', labelsize=10)
+
+    lines = plt.plot(np.log10(far + 1e-12), tar, label='ROC')
+    plt.setp(lines, 'color', 'red', 'linewidth', 3)
+
     plt.grid(True)
     plt.xlabel(r'False Accept Rate', fontsize=18)
     plt.ylabel(r'Genuine Accept Rate', fontsize=18)
-    plt.xlim(xmin=max([min(np.log(far + 1e-12)), -5]))
+
+    plt.xlim(xmin=max([min(np.log10(far + 1e-12)), -5]))
     plt.xlim(xmax=0)
     plt.ylim(ymax=1)
     plt.ylim(ymin=0.4)
@@ -101,9 +108,7 @@ def draw_roc(tar, far, eer, out_dir):
     plt.xticks(np.array([-4, -2, 0]), ['$10^{-4}$', '$10^{-2}$', '$10^{0}$'], fontsize=16)
     plt.yticks(np.array([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]), fontsize=16)
 
-    lines = plt.plot(np.log(far + 1e-12), tar, label='ROC')
-    plt.setp(lines, 'color', 'red', 'linewidth', 3)
-    plt.legend(labels=['DCGNet; EER: %.2f%%' % (eer * 100)], loc='lower right', shadow=False, prop={'size': 16})
+    plt.legend(labels=[label + "; EER: %.2f%%" % (eer * 100)], loc='lower right', shadow=False, prop={'size': 16})
     dst = os.path.join(out_dir, "roc.pdf")
     plt.savefig(dst, bbox_inches='tight')
     return 0
@@ -139,12 +144,20 @@ def main(args, out_dir):
     tar, far = np.sum(tar, axis=0) / np.sum(len_g), np.sum(far, axis=0) / np.sum(len_i)
     np.save(os.path.join(out_dir, 'tar.npy'), tar)
     np.save(os.path.join(out_dir, 'far.npy'), far)
-    # equal error rate: false acceptance rate = false rejection rate
-    # far from 0 to 1
-    # tar from 0 to 1, frr = 1- tar from 1 to 0
-    eer_index = np.argmax(np.greater_equal(far, 1 - tar))
-    eer = (far[eer_index - 1] + far[eer_index + 1]) / 2
-    draw_roc(tar, far, eer, out_dir)
+
+    # using scipy to get more accuracy EER
+    x = np.linspace(0, 1, far.shape[0])
+    interp_far = scipy.interpolate.InterpolatedUnivariateSpline(x, far)
+    interp_tar = scipy.interpolate.InterpolatedUnivariateSpline(x, tar)
+    eer_init = x[np.argwhere(np.diff(np.sign(far - (1 - tar))) != 0)]
+
+    def difference(x):
+        return np.abs(interp_far(x) - (1 - interp_tar(x)))
+
+    x_at_crossing = scipy.optimize.fsolve(difference, x0=eer_init)
+    eer = interp_far(x_at_crossing)
+
+    draw_roc(tar, far, eer, out_dir, label=args.label)
 
     return 0
 
@@ -163,6 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_classes", type=int, dest="num_classes", default=1424)
     parser.add_argument("--finetuning", type=str, dest="finetuning",
                         default="./weights/")
+    parser.add_argument("--label", type=str, default="ViT")
     args = parser.parse_args()
 
     out_dir = os.path.join(args.finetuning, 'ROC-HD-R3')

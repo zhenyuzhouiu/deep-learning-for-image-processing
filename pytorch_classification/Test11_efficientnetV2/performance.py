@@ -69,6 +69,9 @@ def matching_scores(args, model, test_loader, probe_sample, device):
 
 
 def tar_far_n(g_socres, i_scores, step=500):
+    """
+    From the scores, we can get the number of scores of tar and far instead of rate
+    """
     # from the difference correspondence graph network DCGNet, the similarity score
     tar, far = [], []
     n_g, n_i = g_socres.shape[0], i_scores.shape[0]

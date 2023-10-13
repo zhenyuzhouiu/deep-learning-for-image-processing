@@ -18,12 +18,13 @@ from vit_model import vit_base_patch16_224_in21k as create_model
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
-def data(probe_subject, data_path, image_size, batch_size, num_workers):
+def data(probe_subject, data_path, data2_path, image_size, batch_size, num_workers, protocol):
     transform = transforms.Compose([transforms.ToTensor()])
     test_dataset = MyDataSetTest(probe_subject=probe_subject,
                                  data_path=data_path,
+                                 data2_path=data2_path,
                                  image_size=image_size,
-                                 protocol="all",  # all or one
+                                 protocol=protocol,  # two_session or one_session
                                  transform=transform)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return test_loader, test_dataset.probe_sample, test_dataset.gallery_sample
@@ -53,19 +54,31 @@ def matching_scores(args, model, test_loader, probe_sample, device):
             out_feature = out
         else:
             out_feature = torch.cat([out_feature, out], dim=0)
-    probe_feature = out_feature[0:probe_sample, :]
+
+    if args.protocol == "one_session":
+        probe_feature = out_feature[0:probe_sample, :]
+        gallery_feature = out_feature
+    elif args.protocol == "two_session":
+        probe_sample = out_feature[0:probe_sample, :]
+        gallery_feature = out_feature[probe_sample:, :]
 
     # calculate matching scores with cosine similarity
     probe_feature = probe_feature.data.cpu().numpy()
-    out_feature = out_feature.data.cpu().numpy()
-    num = np.dot(probe_feature, np.array(out_feature).T)  # [probe_sample, n_sample]
-    norm = np.linalg.norm(probe_feature, axis=1).reshape(-1, 1) * np.linalg.norm(out_feature, axis=1)
+    gallery_feature = gallery_feature.data.cpu().numpy()
+    num = np.dot(probe_feature, np.array(gallery_feature).T)  # [probe_sample, n_sample]
+    norm = np.linalg.norm(probe_feature, axis=1).reshape(-1, 1) * np.linalg.norm(gallery_feature, axis=1)
     cos_similarity = num / norm
     cos_similarity[np.isneginf(cos_similarity)] = 0
     cos_similarity = 0.5 + 0.5 * cos_similarity  # range from [0, 1]
 
-    g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
-    i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+    if args.protocol == "one_session":
+        # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
+        g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
+        g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
+        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+    elif args.protocol == "two_session":
+        g_scores = cos_similarity[:, :probe_sample].reshape(-1)
+        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
 
     return g_scores, i_scores
 
@@ -124,6 +137,7 @@ def main(args, out_dir):
     print("Loaded pretrained ViT model")
 
     # index
+    g_scores, i_scores = None, None
     tar, far = None, None
     len_g, len_i = [], []
 
@@ -131,9 +145,13 @@ def main(args, out_dir):
     subject_list = os.listdir(args.data_path)
     subject_list.sort()
     for subject in subject_list:
-        test_loader, probe_sample, gallery_sample = data(subject, args.data_path, args.image_size, args.batch_size, args.num_workers)
+        test_loader, probe_sample, gallery_sample = data(subject, args.data_path, args.data2_path, args.image_size,
+                                                         args.batch_size, args.num_workers, args.protocol)
         g_scores_e, i_scores_e = matching_scores(args, model, test_loader, probe_sample, device)
         if g_scores_e is not None and i_scores_e is not None:
+            if args.save_scores:
+                g_scores = g_scores_e if g_scores is None else np.concatenate((g_scores, g_scores_e))
+                i_scores = i_scores_e if i_scores is None else np.concatenate((i_scores, i_scores_e))
             tar_e, far_e = tar_far_n(g_scores_e, i_scores_e)  # [1, 500]
             tar = tar_e if tar is None else np.concatenate((tar, tar_e), axis=0)
             far = far_e if far is None else np.concatenate((far, far_e), axis=0)
@@ -144,6 +162,9 @@ def main(args, out_dir):
     tar, far = np.sum(tar, axis=0) / np.sum(len_g), np.sum(far, axis=0) / np.sum(len_i)
     np.save(os.path.join(out_dir, 'tar.npy'), tar)
     np.save(os.path.join(out_dir, 'far.npy'), far)
+    if args.save_scores:
+        np.save(os.path.join(out_dir, 'g_scores.npy'), g_scores)
+        np.save(os.path.join(out_dir, 'i_scores.npy'), i_scores)
 
     # using scipy to get more accuracy EER
     x = np.linspace(0, 1, far.shape[0])
@@ -167,19 +188,23 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', type=str,
                         default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/R3",
                         help='the data source path')
+    parser.add_argument('--data2_path', type=str,
+                        default="", help="the second data source path")
+    parser.add_argument('--protocol', type=str, default="two_session", help="two_session or one_session")
     parser.add_argument('--image_size', type=int, nargs='+', default=[224, 224],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')
     parser.add_argument("--batch_size", type=int, dest="batch_size", default=32)
     parser.add_argument("--num_workers", type=int, dest="num_workers", default=8)
     parser.add_argument("--device", type=str, dest="device", default="cuda:1",
                         help="cuda device 0 or 1, or cpu")
-    parser.add_argument("--num_classes", type=int, dest="num_classes", default=1424)
+    parser.add_argument("--num_classes", type=int, dest="num_classes", default=117)
     parser.add_argument("--finetuning", type=str, dest="finetuning",
                         default="./weights/")
     parser.add_argument("--label", type=str, default="ViT")
+    parser.add_argument("--save_scores", type=bool, default="True")
     args = parser.parse_args()
 
-    out_dir = os.path.join(args.finetuning, 'ROC-HD-R3')
+    out_dir = os.path.join(args.finetuning, 'ROC-FKV3')
 
     print("[*] Target ROC Output Path: {}".format(out_dir))
     if not os.path.exists(out_dir):

@@ -8,7 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 import torch.optim.lr_scheduler as lr_scheduler
 
-from model import densenet121, load_state_dict
+# from model import densenet121, load_state_dict
+from model import densenet161, load_state_dict
 from my_dataset import MyDataSet
 from utils import read_split_data, train_one_epoch, evaluate
 
@@ -19,8 +20,8 @@ def main(args):
     print(args)
     print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
     tb_writer = SummaryWriter()
-    if os.path.exists("./weights") is False:
-        os.makedirs("./weights")
+    if os.path.exists("./fkvideo-weight") is False:
+        os.makedirs("./fkvideo-weight")
 
     train_images_path, train_images_label, val_images_path, val_images_label = read_split_data(args.data_path)
 
@@ -62,7 +63,8 @@ def main(args):
                                              collate_fn=val_dataset.collate_fn)
 
     # 如果存在预训练权重则载入
-    model = densenet121(num_classes=args.num_classes).to(device)
+    # model = densenet121(num_classes=args.num_classes).to(device)
+    model = densenet161(num_classes=args.num_classes).to(device)
     if args.weights != "":
         if os.path.exists(args.weights):
             load_state_dict(model, args.weights)
@@ -84,11 +86,11 @@ def main(args):
 
     for epoch in range(args.epochs):
         # train
-        mean_loss = train_one_epoch(model=model,
-                                    optimizer=optimizer,
-                                    data_loader=train_loader,
-                                    device=device,
-                                    epoch=epoch)
+        mean_loss, train_acc = train_one_epoch(model=model,
+                                               optimizer=optimizer,
+                                               data_loader=train_loader,
+                                               device=device,
+                                               epoch=epoch)
 
         scheduler.step()
 
@@ -100,16 +102,28 @@ def main(args):
         print("[epoch {}] accuracy: {}".format(epoch, round(acc, 3)))
         tags = ["loss", "accuracy", "learning_rate"]
         tb_writer.add_scalar(tags[0], mean_loss, epoch)
-        tb_writer.add_scalar(tags[1], acc, epoch)
-        tb_writer.add_scalar(tags[2], optimizer.param_groups[0]["lr"], epoch)
+        tb_writer.add_scalar(tags[1], train_acc, epoch)
+        tb_writer.add_scalar(tags[2], acc, epoch)
+        tb_writer.add_scalar(tags[3], optimizer.param_groups[0]["lr"], epoch)
 
-        torch.save(model.state_dict(), "./weights/model-{}.pth".format(epoch))
+        torch.save(model.state_dict(), "./fkvideo-weight/last.pth".format(epoch))
+        current_loss = mean_loss
+        current_acc = (train_acc + acc) / 2
+        if epoch == 0:
+            best_loss = current_loss
+            best_acc = current_acc
+            torch.save(model.state_dict(), "./fkvideo-weight/best.pth")
+        else:
+            if current_loss < best_loss and current_acc > best_acc:
+                best_loss = current_loss
+                best_acc = current_acc
+                torch.save(model.state_dict(), "./fkvideo-weight/best.pth")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_classes', type=int, default=5)
-    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--num_classes', type=int, default=1023)
+    parser.add_argument('--epochs', type=int, default=3000)
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--lrf', type=float, default=0.1)
@@ -117,11 +131,11 @@ if __name__ == '__main__':
     # 数据集所在根目录
     # https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz
     parser.add_argument('--data-path', type=str,
-                        default="/data/flower_photos")
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/Left-25/")
 
     # densenet121 官方权重下载地址
     # https://download.pytorch.org/models/densenet121-a639ec97.pth
-    parser.add_argument('--weights', type=str, default='densenet121.pth',
+    parser.add_argument('--weights', type=str, default='./pre-trained/densenet161-8d451a50.pth',
                         help='initial weights path')
     parser.add_argument('--freeze-layers', type=bool, default=False)
     parser.add_argument('--device', default='cuda:0', help='device id (i.e. 0 or 0,1 or cpu)')

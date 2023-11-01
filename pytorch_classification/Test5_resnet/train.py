@@ -9,7 +9,8 @@ from torchvision import transforms, datasets
 from tqdm import tqdm
 
 # from model import resnet34
-from model import resnet50
+# from model import resnet50
+from model import resnet101
 
 
 def main():
@@ -31,7 +32,7 @@ def main():
 
     # data_root = os.path.abspath(os.path.join(os.getcwd(), "../.."))  # get data root path
     # image_path = os.path.join(data_root, "data_set", "flower_data")  # flower data set path
-    image_path = "/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_1/105-221/"
+    image_path = "/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/Left-25/"
     assert os.path.exists(image_path), "{} path does not exist.".format(image_path)
     train_dataset = datasets.ImageFolder(root=os.path.join(image_path),
                                          transform=data_transform["train"])
@@ -63,10 +64,11 @@ def main():
     print("using {} images for training, {} images for validation.".format(train_num,
                                                                            val_num))
     
-    net = resnet50()
+    # net = resnet50()
+    net = resnet101()
     # load pretrain weights
     # download url: https://download.pytorch.org/models/resnet34-333f7ec4.pth
-    model_weight_path = "./hd_weights/resNet50.pth"
+    model_weight_path = "./pre_trained/resnet101-5d3b4d8f.pth"
     assert os.path.exists(model_weight_path), "file {} does not exist.".format(model_weight_path)
     weights_dict = torch.load(model_weight_path, map_location='cpu')
     del_keys = ['fc.weight', 'fc.bias']
@@ -78,7 +80,7 @@ def main():
 
     # change fc layer structure
     in_channel = net.fc.in_features
-    net.fc = nn.Linear(in_channel, 117)
+    net.fc = nn.Linear(in_channel, 1023)
     net.to(device)
 
     # define loss function
@@ -91,7 +93,7 @@ def main():
 
     epochs = 3000
     best_acc = 0.0
-    save_path = './fkv3_weights_pretrained_hd'
+    save_path = './fkvideo-weight'
     if not os.path.exists(save_path):
         os.mkdir(save_path)
     train_steps = len(train_loader)

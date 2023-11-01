@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 import cv2
 import os
 import numpy as np
+
+
 class MyDataSet(Dataset):
     """自定义数据集"""
 
@@ -101,7 +103,7 @@ class MyDataSetTest(Dataset):
             label = 1.0
 
         else:
-            image = load_image(self.list_gallery[item-self.probe_sample], image_size=self.image_size, rgb=True)
+            image = load_image(self.list_gallery[item - self.probe_sample], image_size=self.image_size, rgb=True)
             image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
             label = 0.0
 

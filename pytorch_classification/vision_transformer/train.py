@@ -17,8 +17,8 @@ from utils import read_split_data, train_one_epoch, evaluate
 def main(args):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
-    if os.path.exists("./weights") is False:
-        os.makedirs("./weights")
+    if os.path.exists("./fkvideo-weight") is False:
+        os.makedirs("./fkvideo-weight")
 
     tb_writer = SummaryWriter()
 
@@ -65,7 +65,7 @@ def main(args):
                                              num_workers=nw,
                                              collate_fn=val_dataset.collate_fn)
 
-    model = create_model(num_classes=args.num_classes, has_logits=False).to(device)
+    model = create_model(num_classes=args.num_classes).to(device)
 
     if args.weights != "":
         assert os.path.exists(args.weights), "weights file: '{}' not exist.".format(args.weights)
@@ -76,6 +76,7 @@ def main(args):
         for k in del_keys:
             del weights_dict[k]
         print(model.load_state_dict(weights_dict, strict=False))
+        print("loaded pretrained model successfully")
 
     if args.freeze_layers:
         for name, para in model.named_parameters():
@@ -114,25 +115,25 @@ def main(args):
         tb_writer.add_scalar(tags[3], val_acc, epoch)
         tb_writer.add_scalar(tags[4], optimizer.param_groups[0]["lr"], epoch)
 
-        torch.save(model.state_dict(), "./weights/last.pth")
+        torch.save(model.state_dict(), "./fkvideo-weight/last.pth")
         current_loss = (train_loss + val_loss) / 2
         current_acc = (train_acc + val_acc) / 2
         if epoch == 0:
             best_loss = current_loss
             best_acc = current_acc
-            torch.save(model.state_dict(), "./weights/best.pth")
+            torch.save(model.state_dict(), "./fkvideo-weight/best.pth")
         else:
             if current_loss < best_loss and current_acc > best_acc:
                 best_loss = current_loss
                 best_acc = current_acc
-                torch.save(model.state_dict(), "./weights/best.pth")
+                torch.save(model.state_dict(), "./fkvideo-weight/best.pth")
 
 
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_classes', type=int, default=1424)
+    parser.add_argument('--num_classes', type=int, default=1023)
     parser.add_argument('--epochs', type=int, default=3000)
     parser.add_argument('--batch-size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=0.001)
@@ -141,7 +142,7 @@ if __name__ == '__main__':
     # 数据集所在根目录
     # https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz
     parser.add_argument('--data-path', type=str,
-                        default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/train/")
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/Left-25/")
     parser.add_argument('--val_rate', type=float,
                         default=0.2)
     parser.add_argument('--model-name', default='', help='create model name')

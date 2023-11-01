@@ -15,7 +15,7 @@ def read_split_data(root: str, val_rate: float = 0.2):
     assert os.path.exists(root), "dataset root: {} does not exist.".format(root)
 
     # 遍历文件夹，一个文件夹对应一个类别
-    flower_class = [cla for cla in os.listdir(root) if os.path.isdir(os.path.join(root, cla))]
+    flower_class = [cla for cla in os.listdir(root) if os.path.isdir(os.path.join(root, cla)) and not cla.startswith('.')]
     # 排序，保证各平台顺序一致
     flower_class.sort()
     # 生成类别名称以及对应的数字索引
@@ -35,7 +35,7 @@ def read_split_data(root: str, val_rate: float = 0.2):
         cla_path = os.path.join(root, cla)
         # 遍历获取supported支持的所有文件路径
         images = [os.path.join(root, cla, i) for i in os.listdir(cla_path)
-                  if os.path.splitext(i)[-1] in supported]
+                  if os.path.splitext(i)[-1] in supported and not i.startswith('.')]
         # 排序，保证各平台顺序一致
         images.sort()
         # 获取该类别对应的索引

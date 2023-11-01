@@ -13,7 +13,7 @@ from model import resnet50
 
 
 def main():
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("using {} device.".format(device))
 
     data_transform = {
@@ -31,9 +31,9 @@ def main():
 
     # data_root = os.path.abspath(os.path.join(os.getcwd(), "../.."))  # get data root path
     # image_path = os.path.join(data_root, "data_set", "flower_data")  # flower data set path
-    image_path = "/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/"
+    image_path = "/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_1/105-221/"
     assert os.path.exists(image_path), "{} path does not exist.".format(image_path)
-    train_dataset = datasets.ImageFolder(root=os.path.join(image_path, "train"),
+    train_dataset = datasets.ImageFolder(root=os.path.join(image_path),
                                          transform=data_transform["train"])
     train_num = len(train_dataset)
 
@@ -53,7 +53,7 @@ def main():
                                                batch_size=batch_size, shuffle=True,
                                                num_workers=nw)
 
-    validate_dataset = datasets.ImageFolder(root=os.path.join(image_path, "train"),
+    validate_dataset = datasets.ImageFolder(root=os.path.join(image_path),
                                             transform=data_transform["val"])
     val_num = len(validate_dataset)
     validate_loader = torch.utils.data.DataLoader(validate_dataset,
@@ -66,15 +66,19 @@ def main():
     net = resnet50()
     # load pretrain weights
     # download url: https://download.pytorch.org/models/resnet34-333f7ec4.pth
-    model_weight_path = "./pre-trained/resnet50-19c8e357.pth"
+    model_weight_path = "./hd_weights/resNet50.pth"
     assert os.path.exists(model_weight_path), "file {} does not exist.".format(model_weight_path)
-    net.load_state_dict(torch.load(model_weight_path, map_location='cpu'))
+    weights_dict = torch.load(model_weight_path, map_location='cpu')
+    del_keys = ['fc.weight', 'fc.bias']
+    for k in del_keys:
+        del weights_dict[k]
+    net.load_state_dict(weights_dict, strict=False)
     # for param in net.parameters():
     #     param.requires_grad = False
 
     # change fc layer structure
     in_channel = net.fc.in_features
-    net.fc = nn.Linear(in_channel, 1424)
+    net.fc = nn.Linear(in_channel, 117)
     net.to(device)
 
     # define loss function
@@ -87,7 +91,7 @@ def main():
 
     epochs = 3000
     best_acc = 0.0
-    save_path = './weights'
+    save_path = './fkv3_weights_pretrained_hd'
     if not os.path.exists(save_path):
         os.mkdir(save_path)
     train_steps = len(train_loader)

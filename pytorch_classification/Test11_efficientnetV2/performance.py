@@ -59,7 +59,7 @@ def matching_scores(args, model, test_loader, probe_sample, device):
         probe_feature = out_feature[0:probe_sample, :]
         gallery_feature = out_feature
     elif args.protocol == "two_session":
-        probe_sample = out_feature[0:probe_sample, :]
+        probe_feature = out_feature[0:probe_sample, :]
         gallery_feature = out_feature[probe_sample:, :]
 
     # calculate matching scores with cosine similarity
@@ -71,14 +71,11 @@ def matching_scores(args, model, test_loader, probe_sample, device):
     cos_similarity[np.isneginf(cos_similarity)] = 0
     cos_similarity = 0.5 + 0.5 * cos_similarity  # range from [0, 1]
 
-    if args.protocol == "one_session":
-        # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
-        g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
-        g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
-        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
-    elif args.protocol == "two_session":
-        g_scores = cos_similarity[:, :probe_sample].reshape(-1)
-        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+    # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
+    # g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
+    # g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
+    g_scores = cos_similarity[:, :probe_sample].reshape(-1)
+    i_scores = cos_similarity[:, probe_sample:].reshape(-1)
 
     return g_scores, i_scores
 
@@ -132,7 +129,7 @@ def main(args, out_dir):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
     # load model
-    model = create_model(num_classes=args.num_classes, has_logits=False).to(device)
+    model = create_model(num_classes=args.num_classes).to(device)
     model = load(model, os.path.join(args.finetuning, "best.pth"), device, if_train=False)
     print("Loaded pretrained ViT model")
 
@@ -186,25 +183,25 @@ def main(args, out_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str,
-                        default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/R3",
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_1/1-104",
                         help='the data source path')
     parser.add_argument('--data2_path', type=str,
-                        default="", help="the second data source path")
-    parser.add_argument('--protocol', type=str, default="two_session", help="two_session or one_session")
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2/", help="the second data source path")
+    parser.add_argument('--protocol', type=str, default="one_session", help="two_session or one_session")
     parser.add_argument('--image_size', type=int, nargs='+', default=[384, 480],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')
     parser.add_argument("--batch_size", type=int, dest="batch_size", default=32)
     parser.add_argument("--num_workers", type=int, dest="num_workers", default=8)
-    parser.add_argument("--device", type=str, dest="device", default="cuda:1",
+    parser.add_argument("--device", type=str, dest="device", default="cuda:0",
                         help="cuda device 0 or 1, or cpu")
     parser.add_argument("--num_classes", type=int, dest="num_classes", default=117)
     parser.add_argument("--finetuning", type=str, dest="finetuning",
-                        default="./weights/")
+                        default="./fkv3_weights/")
     parser.add_argument("--label", type=str, default="EfficientNetv2")
     parser.add_argument("--save_scores", type=bool, default="True")
     args = parser.parse_args()
 
-    out_dir = os.path.join(args.finetuning, 'ROC-FKV3')
+    out_dir = os.path.join(args.finetuning, 'ROC-FKV3-Session1-1-104')
 
     print("[*] Target ROC Output Path: {}".format(out_dir))
     if not os.path.exists(out_dir):

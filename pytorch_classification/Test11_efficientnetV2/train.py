@@ -20,8 +20,8 @@ def main(args):
     print(args)
     print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
     tb_writer = SummaryWriter()
-    if os.path.exists("./weights") is False:
-        os.makedirs("./weights")
+    if os.path.exists("./fkvideo-weight") is False:
+        os.makedirs("./fkvideo-weight")
 
     train_images_path, train_images_label, val_images_path, val_images_label = read_split_data(args.data_path,
                                                                                                args.val_rate)
@@ -120,41 +120,41 @@ def main(args):
         tb_writer.add_scalar(tags[3], val_acc, epoch)
         tb_writer.add_scalar(tags[4], optimizer.param_groups[0]["lr"], epoch)
 
-        torch.save(model.state_dict(), "./weights/last.pth")
+        torch.save(model.state_dict(), "./fkvideo-weight/last.pth")
         current_loss = (train_loss + val_loss) / 2
         current_acc = (train_acc + val_acc) / 2
         if epoch == 0:
             best_loss = current_loss
             best_acc = current_acc
-            torch.save(model.state_dict(), "./weights/best.pth")
+            torch.save(model.state_dict(), "./fkvideo-weight/best.pth")
         else:
             if current_loss < best_loss and current_acc > best_acc:
                 best_loss = current_loss
                 best_acc = current_acc
-                torch.save(model.state_dict(), "./weights/best.pth")
+                torch.save(model.state_dict(), "./fkvideo-weight/best.pth")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_classes', type=int, default=1424)
+    parser.add_argument('--num_classes', type=int, default=1023)
     parser.add_argument('--epochs', type=int, default=3000)
-    parser.add_argument('--batch-size', type=int, default=2)
+    parser.add_argument('--batch-size', type=int, default=4)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--lrf', type=float, default=0.01)
 
     # 数据集所在根目录
     # https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz
     parser.add_argument('--data-path', type=str,
-                        default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/train/")
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/Left-25/")
     parser.add_argument('--val_rate', type=float,
                         default=0.2)
-
+    
     # download model weights
     # 链接: https://pan.baidu.com/s/1uZX36rvrfEss-JGj4yfzbQ  密码: 5gu1
     parser.add_argument('--weights', type=str, default='./torch_efficientnetv2/pre_efficientnetv2-m.pth',
                         help='initial weights path')
     parser.add_argument('--freeze-layers', type=bool, default=False)
-    parser.add_argument('--device', default='cuda:1', help='device id (i.e. 0 or 0,1 or cpu)')
+    parser.add_argument('--device', default='cuda:2', help='device id (i.e. 0 or 0,1 or cpu)')
 
     opt = parser.parse_args()
 

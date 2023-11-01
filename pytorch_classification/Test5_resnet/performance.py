@@ -59,7 +59,7 @@ def matching_scores(args, model, test_loader, probe_sample, device):
         probe_feature = out_feature[0:probe_sample, :]
         gallery_feature = out_feature
     elif args.protocol == "two_session":
-        probe_sample = out_feature[0:probe_sample, :]
+        probe_feature = out_feature[0:probe_sample, :]
         gallery_feature = out_feature[probe_sample:, :]
 
     # calculate matching scores with cosine similarity
@@ -71,14 +71,11 @@ def matching_scores(args, model, test_loader, probe_sample, device):
     cos_similarity[np.isneginf(cos_similarity)] = 0
     cos_similarity = 0.5 + 0.5 * cos_similarity  # range from [0, 1]
 
-    if args.protocol == "one_session":
-        # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
-        g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
-        g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
-        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
-    elif args.protocol == "two_session":
-        g_scores = cos_similarity[:, :probe_sample].reshape(-1)
-        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+    # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
+    # g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
+    # g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
+    g_scores = cos_similarity[:, :probe_sample].reshape(-1)
+    i_scores = cos_similarity[:, probe_sample:].reshape(-1)
 
     return g_scores, i_scores
 
@@ -149,8 +146,8 @@ def main(args, out_dir):
     subject_list = os.listdir(args.data_path)
     subject_list.sort()
     for subject in subject_list:
-        test_loader, probe_sample, gallery_sample = data(subject, args.data_path, args.image_size, args.batch_size,
-                                                         args.num_workers)
+        test_loader, probe_sample, gallery_sample = data(subject, args.data_path, args.data2_path, args.image_size, args.batch_size,
+                                                         args.num_workers, args.protocol)
         g_scores_e, i_scores_e = matching_scores(args, model, test_loader, probe_sample, device)
         if g_scores_e is not None and i_scores_e is not None:
             if args.save_scores:
@@ -190,11 +187,11 @@ def main(args, out_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str,
-                        default="/mnt/Data/Finger-Knuckle-Database/HD/YOLOv5_Segment/R3",
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_1/1-104",
                         help='the data source path')
     parser.add_argument('--data2_path', type=str,
-                        default="", help="the second data source path")
-    parser.add_argument('--protocol', type=str, default="two_session", help="two_session or one_session")
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2", help="the second data source path")
+    parser.add_argument('--protocol', type=str, default="one_session", help="two_session or one_session")
     parser.add_argument('--image_size', type=int, nargs='+', default=[224, 224],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')
     parser.add_argument("--batch_size", type=int, dest="batch_size", default=32)
@@ -203,12 +200,12 @@ if __name__ == "__main__":
                         help="cuda device 0 or 1, or cpu")
     parser.add_argument("--num_classes", type=int, dest="num_classes", default=117)
     parser.add_argument("--finetuning", type=str, dest="finetuning",
-                        default="./weights/")
+                        default="./fkv3_weights/")
     parser.add_argument("--label", type=str, default="ResNet")
     parser.add_argument("--save_scores", type=bool, default="True")
     args = parser.parse_args()
 
-    out_dir = os.path.join(args.finetuning, 'ROC-FKV3')
+    out_dir = os.path.join(args.finetuning, 'ROC-FKV3-Session1-1-104')
 
     print("[*] Target ROC Output Path: {}".format(out_dir))
     if not os.path.exists(out_dir):

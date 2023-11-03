@@ -19,7 +19,14 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 def data(probe_subject, data_path, data2_path, image_size, batch_size, num_workers, protocol, visited_subject=[]):
-    transform = transforms.Compose([transforms.ToTensor()])
+    img_size = {"s": [300, 384],  # train_size, val_size
+                "m": [384, 480],
+                "l": [384, 480]}
+    num_model = "m"
+    transform = transforms.Compose([transforms.Resize(img_size[num_model][1]),
+                                    transforms.CenterCrop(img_size[num_model][1]),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
     test_dataset = MyDataSetTest(probe_subject=probe_subject,
                                  data_path=data_path,
                                  data2_path=data2_path,
@@ -92,8 +99,8 @@ def tar_far(g_socres, i_scores, step=1000):
     n_g, n_i = g_socres.shape[0], i_scores.shape[0]
     threshod = np.linspace(1, 0, step)
     for t in threshod:
-        tar.append(np.sum(np.where(g_socres >= t, True, False))/n_g)
-        far.append(np.sum(np.where(i_scores >= t, True, False))/n_i)
+        tar.append(np.sum(np.where(g_socres >= t, True, False)) / n_g)
+        far.append(np.sum(np.where(i_scores >= t, True, False)) / n_i)
     tar, far = np.stack(tar).reshape(1, -1), np.stack(far).reshape(1, -1)
 
     return tar.reshape(-1), far.reshape(-1)
@@ -185,7 +192,8 @@ if __name__ == "__main__":
                         default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/R2-10/",
                         help='the data source path')
     parser.add_argument('--data2_path', type=str,
-                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2/", help="the second data source path")
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2/",
+                        help="the second data source path")
     parser.add_argument('--protocol', type=str, default="one_session", help="two_session or one_session")
     parser.add_argument('--image_size', type=int, nargs='+', default=[384, 480],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')

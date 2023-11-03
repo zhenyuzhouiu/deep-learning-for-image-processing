@@ -66,13 +66,15 @@ class MyDataSetTest(Dataset):
         Firstly, extract the probe sample
         """
         if item < self.probe_sample:
-            image = load_image(self.list_probe[item], image_size=self.image_size, rgb=True)
-            image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            # image = load_image(self.list_probe[item], image_size=self.image_size, rgb=True)
+            # image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            image = Image.open(self.list_probe[item])
             label = 1.0
 
         else:
-            image = load_image(self.list_gallery[item-self.probe_sample], image_size=self.image_size, rgb=True)
-            image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            # image = load_image(self.list_gallery[item-self.probe_sample], image_size=self.image_size, rgb=True)
+            # image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            image = Image.open(self.list_gallery[item-self.probe_sample])
             label = 0.0
 
         if self.transform is not None:
@@ -88,7 +90,7 @@ class MyDataSetTest(Dataset):
             list_subject.sort()
             # delete visited subject
             for i in range(len(self.visited_subject)):
-                del list_subject[self.visited_subject[i]]
+                list_subject.remove(self.visited_subject[i])
             for subject in list_subject:
                 list_file = os.listdir(os.path.join(self.data_path, subject))
                 list_file.sort()
@@ -105,7 +107,7 @@ class MyDataSetTest(Dataset):
             list_subject.sort()
             # delete visited subject
             for i in range(len(self.visited_subject)):
-                del list_subject[self.visited_subject[i]]
+                list_subject.remove(self.visited_subject[i])
             for subject in list_subject:
                 list_file = os.listdir(os.path.join(self.data_path, subject))
                 list_file.sort()

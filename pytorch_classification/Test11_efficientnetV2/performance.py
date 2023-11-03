@@ -18,14 +18,15 @@ from model import efficientnetv2_m as create_model
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
-def data(probe_subject, data_path, data2_path, image_size, batch_size, num_workers, protocol):
+def data(probe_subject, data_path, data2_path, image_size, batch_size, num_workers, protocol, visited_subject=[]):
     transform = transforms.Compose([transforms.ToTensor()])
     test_dataset = MyDataSetTest(probe_subject=probe_subject,
                                  data_path=data_path,
                                  data2_path=data2_path,
                                  image_size=image_size,
                                  protocol=protocol,  # two_session or one_session
-                                 transform=transform)
+                                 transform=transform,
+                                 visited_subject=visited_subject)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return test_loader, test_dataset.probe_sample, test_dataset.gallery_sample
 
@@ -71,26 +72,31 @@ def matching_scores(args, model, test_loader, probe_sample, device):
     cos_similarity[np.isneginf(cos_similarity)] = 0
     cos_similarity = 0.5 + 0.5 * cos_similarity  # range from [0, 1]
 
-    # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
+    # upright
+    g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
+
+    # delete diagonal elements
     # g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
     # g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
-    g_scores = cos_similarity[:, :probe_sample].reshape(-1)
+
+    # all elements
+    # g_scores = cos_similarity[:, :probe_sample].reshape(-1)
     i_scores = cos_similarity[:, probe_sample:].reshape(-1)
 
     return g_scores, i_scores
 
 
-def tar_far_n(g_socres, i_scores, step=1000):
+def tar_far(g_socres, i_scores, step=1000):
     # from the difference correspondence graph network DCGNet, the similarity score
     tar, far = [], []
     n_g, n_i = g_socres.shape[0], i_scores.shape[0]
     threshod = np.linspace(1, 0, step)
     for t in threshod:
-        tar.append(np.sum(np.where(g_socres >= t, True, False)))
-        far.append(np.sum(np.where(i_scores >= t, True, False)))
+        tar.append(np.sum(np.where(g_socres >= t, True, False))/n_g)
+        far.append(np.sum(np.where(i_scores >= t, True, False))/n_i)
     tar, far = np.stack(tar).reshape(1, -1), np.stack(far).reshape(1, -1)
 
-    return tar, far
+    return tar.reshape(-1), far.reshape(-1)
 
 
 def draw_roc(tar, far, eer, out_dir, label):
@@ -135,33 +141,26 @@ def main(args, out_dir):
 
     # index
     g_scores, i_scores = None, None
-    tar, far = None, None
-    len_g, len_i = [], []
 
     # dataset
     subject_list = os.listdir(args.data_path)
     subject_list.sort()
+    visited_subject = []
     for subject in subject_list:
         test_loader, probe_sample, gallery_sample = data(subject, args.data_path, args.data2_path, args.image_size,
-                                                         args.batch_size, args.num_workers, args.protocol)
+                                                         args.batch_size, args.num_workers, args.protocol,
+                                                         visited_subject=visited_subject)
         g_scores_e, i_scores_e = matching_scores(args, model, test_loader, probe_sample, device)
+        visited_subject.append(subject)
         if g_scores_e is not None and i_scores_e is not None:
-            if args.save_scores:
-                g_scores = g_scores_e if g_scores is None else np.concatenate((g_scores, g_scores_e))
-                i_scores = i_scores_e if i_scores is None else np.concatenate((i_scores, i_scores_e))
-            tar_e, far_e = tar_far_n(g_scores_e, i_scores_e)  # [1, 500]
-            tar = tar_e if tar is None else np.concatenate((tar, tar_e), axis=0)
-            far = far_e if far is None else np.concatenate((far, far_e), axis=0)
-            len_g.append(g_scores_e.shape[0])
-            len_i.append(i_scores_e.shape[0])
+            g_scores = g_scores_e if g_scores is None else np.concatenate((g_scores, g_scores_e))
+            i_scores = i_scores_e if i_scores is None else np.concatenate((i_scores, i_scores_e))
 
-    len_g, len_i = np.array(len_g), np.array(len_i)
-    tar, far = np.sum(tar, axis=0) / np.sum(len_g), np.sum(far, axis=0) / np.sum(len_i)
-    np.save(os.path.join(out_dir, 'tar.npy'), tar)
-    np.save(os.path.join(out_dir, 'far.npy'), far)
     if args.save_scores:
         np.save(os.path.join(out_dir, 'g_scores.npy'), g_scores)
         np.save(os.path.join(out_dir, 'i_scores.npy'), i_scores)
+
+    tar, far = tar_far(g_socres=g_scores, i_scores=i_scores)
 
     # using scipy to get more accuracy EER
     x = np.linspace(0, 1, far.shape[0])
@@ -183,7 +182,7 @@ def main(args, out_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str,
-                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_1/1-104",
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/R2-10/",
                         help='the data source path')
     parser.add_argument('--data2_path', type=str,
                         default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2/", help="the second data source path")
@@ -194,14 +193,14 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, dest="num_workers", default=8)
     parser.add_argument("--device", type=str, dest="device", default="cuda:0",
                         help="cuda device 0 or 1, or cpu")
-    parser.add_argument("--num_classes", type=int, dest="num_classes", default=117)
+    parser.add_argument("--num_classes", type=int, dest="num_classes", default=1023)
     parser.add_argument("--finetuning", type=str, dest="finetuning",
-                        default="./fkv3_weights/")
+                        default="./fkvideo-weight/")
     parser.add_argument("--label", type=str, default="EfficientNetv2")
     parser.add_argument("--save_scores", type=bool, default="True")
     args = parser.parse_args()
 
-    out_dir = os.path.join(args.finetuning, 'ROC-FKV3-Session1-1-104')
+    out_dir = os.path.join(args.finetuning, 'ROC-FKVIDEO-R2')
 
     print("[*] Target ROC Output Path: {}".format(out_dir))
     if not os.path.exists(out_dir):

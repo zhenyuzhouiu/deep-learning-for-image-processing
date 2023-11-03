@@ -76,7 +76,7 @@ def load_image(image_path, image_size, rgb=True):
 
 
 class MyDataSetTest(Dataset):
-    def __init__(self, probe_subject, data_path, data2_path, image_size, protocol, transform):
+    def __init__(self, probe_subject, data_path, data2_path, image_size, protocol, transform, visited_subject=[]):
         super().__init__()
         """
         the subject and sample of data_path and data2_path should be same
@@ -87,6 +87,7 @@ class MyDataSetTest(Dataset):
         self.data2_path = data2_path
         self.image_size = image_size
         self.transform = transform
+        self.visited_subject = visited_subject
 
         self.probe_sample, self.list_probe, self.gallery_sample, self.list_gallery = self.data_info()
 
@@ -114,39 +115,46 @@ class MyDataSetTest(Dataset):
         return image, label
 
     def data_info(self):
-        probe_sample, gallery_sample = 0, 0
+        probe_sample_n, gallery_sample_n = 0, 0
         list_probe, list_gallery = [], []
         if self.protocol == "one_session":
             list_subject = os.listdir(self.data_path)
             list_subject.sort()
+            # delete visited subject
+            for i in range(len(self.visited_subject)):
+                del list_subject[self.visited_subject[i]]
             for subject in list_subject:
                 list_file = os.listdir(os.path.join(self.data_path, subject))
                 list_file.sort()
                 if subject == self.probe_subject:
-                    probe_sample += len(list_file)
+                    probe_sample_n += len(list_file)
                     for file in list_file:
                         list_probe.append(os.path.join(self.data_path, subject, file))
                 else:
-                    gallery_sample += len(list_file)
+                    gallery_sample_n += len(list_file)
                     for file in list_file:
                         list_gallery.append(os.path.join(self.data_path, subject, file))
         elif self.protocol == "two_session":
             list_subject = os.listdir(self.data_path)
             list_subject.sort()
+            # delete visited subject
+            for i in range(len(self.visited_subject)):
+                del list_subject[self.visited_subject[i]]
             for subject in list_subject:
                 list_file = os.listdir(os.path.join(self.data_path, subject))
                 list_file.sort()
+
                 if subject == self.probe_subject:
-                    probe_sample += len(list_file)
-                    gallery_sample += len(list_file)
+                    probe_sample_n += len(list_file)
+                    gallery_sample_n += len(list_file)
                     for file in list_file:
                         list_probe.append(os.path.join(self.data_path, subject, file))
                         list_gallery.append(os.path.join(self.data2_path, subject, file))
                 else:
-                    gallery_sample += len(list_file)
+                    gallery_sample_n += len(list_file)
                     for file in list_file:
                         list_gallery.append(os.path.join(self.data2_path, subject, file))
         else:
             raise f"please give a right protocol"
 
-        return probe_sample, list_probe, gallery_sample, list_gallery
+        return probe_sample_n, list_probe, gallery_sample_n, list_gallery

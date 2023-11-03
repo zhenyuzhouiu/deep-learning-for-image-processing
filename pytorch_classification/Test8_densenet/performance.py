@@ -12,9 +12,8 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 
-# from model import resnet50
-from model import resnet101
 from my_dataset import MyDataSetTest
+from model import densenet161, load_state_dict
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -83,6 +82,7 @@ def matching_scores(args, model, test_loader, probe_sample, device):
     # all elements
     # g_scores = cos_similarity[:, :probe_sample].reshape(-1)
     i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+
     return g_scores, i_scores
 
 
@@ -135,13 +135,9 @@ def main(args, out_dir):
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
     # load model
-    model = resnet101()
-    # change fc layer structure
-    in_channel = model.fc.in_features
-    model.fc = torch.nn.Linear(in_channel, args.num_classes)
-    model = model.to(device)
-    model = load(model, os.path.join(args.finetuning, "resNet101.pth"), device, if_train=False)
-    print("Loaded pretrained ResNet101 model")
+    model = densenet161(num_classes=args.num_classes).to(device)
+    model = load(model, os.path.join(args.finetuning, "best.pth"), device, if_train=False)
+    print("Loaded pretrained DenseNet model")
 
     # index
     g_scores, i_scores = None, None
@@ -157,15 +153,13 @@ def main(args, out_dir):
         g_scores_e, i_scores_e = matching_scores(args, model, test_loader, probe_sample, device)
         visited_subject.append(subject)
         if g_scores_e is not None and i_scores_e is not None:
-            if args.save_scores:
-                g_scores = g_scores_e if g_scores is None else np.concatenate((g_scores, g_scores_e))
-                i_scores = i_scores_e if i_scores is None else np.concatenate((i_scores, i_scores_e))
+            g_scores = g_scores_e if g_scores is None else np.concatenate((g_scores, g_scores_e))
+            i_scores = i_scores_e if i_scores is None else np.concatenate((i_scores, i_scores_e))
 
     if args.save_scores:
         np.save(os.path.join(out_dir, 'g_scores.npy'), g_scores)
         np.save(os.path.join(out_dir, 'i_scores.npy'), i_scores)
-
-    tar, far = tar_far(g_scores, i_scores)
+    tar, far = tar_far(g_socres=g_scores, i_scores=i_scores)
 
     # using scipy to get more accuracy EER
     x = np.linspace(0, 1, far.shape[0])
@@ -190,7 +184,7 @@ if __name__ == "__main__":
                         default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/R2-10/",
                         help='the data source path')
     parser.add_argument('--data2_path', type=str,
-                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2", help="the second data source path")
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2/", help="the second data source path")
     parser.add_argument('--protocol', type=str, default="one_session", help="two_session or one_session")
     parser.add_argument('--image_size', type=int, nargs='+', default=[224, 224],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')
@@ -201,7 +195,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_classes", type=int, dest="num_classes", default=1023)
     parser.add_argument("--finetuning", type=str, dest="finetuning",
                         default="./fkvideo-weight/")
-    parser.add_argument("--label", type=str, default="ResNet")
+    parser.add_argument("--label", type=str, default="DenseNet")
     parser.add_argument("--save_scores", type=bool, default="True")
     args = parser.parse_args()
 

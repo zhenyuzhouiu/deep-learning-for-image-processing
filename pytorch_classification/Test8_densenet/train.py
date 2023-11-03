@@ -100,7 +100,7 @@ def main(args):
                        device=device)
 
         print("[epoch {}] accuracy: {}".format(epoch, round(acc, 3)))
-        tags = ["loss", "accuracy", "learning_rate"]
+        tags = ["loss", "train_acc", "accuracy", "learning_rate"]
         tb_writer.add_scalar(tags[0], mean_loss, epoch)
         tb_writer.add_scalar(tags[1], train_acc, epoch)
         tb_writer.add_scalar(tags[2], acc, epoch)

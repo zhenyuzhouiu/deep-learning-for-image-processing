@@ -144,7 +144,7 @@ def main(args, out_dir):
     # load model
     model = create_model(num_classes=args.num_classes).to(device)
     model = load(model, os.path.join(args.finetuning, "best.pth"), device, if_train=False)
-    print("Loaded pretrained ViT model")
+    print("Loaded pretrained EfficientNet model")
 
     # index
     g_scores, i_scores = None, None
@@ -189,15 +189,15 @@ def main(args, out_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str,
-                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/R2-10/",
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/image-10/",
                         help='the data source path')
     parser.add_argument('--data2_path', type=str,
-                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/PolyUFK3/Session_2/",
+                        default="/home/ra1/Project/ZZY/finger-knuckle-videos/FKVideo/image-10/",
                         help="the second data source path")
     parser.add_argument('--protocol', type=str, default="one_session", help="two_session or one_session")
     parser.add_argument('--image_size', type=int, nargs='+', default=[384, 480],
                         help='Resize the input image before running inference to the exact dimensions (w, h)')
-    parser.add_argument("--batch_size", type=int, dest="batch_size", default=32)
+    parser.add_argument("--batch_size", type=int, dest="batch_size", default=128)
     parser.add_argument("--num_workers", type=int, dest="num_workers", default=8)
     parser.add_argument("--device", type=str, dest="device", default="cuda:0",
                         help="cuda device 0 or 1, or cpu")
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_scores", type=bool, default="True")
     args = parser.parse_args()
 
-    out_dir = os.path.join(args.finetuning, 'ROC-FKVIDEO-R2')
+    out_dir = os.path.join(args.finetuning, 'ROC-FKVIDEO-R2-NEW')
 
     print("[*] Target ROC Output Path: {}".format(out_dir))
     if not os.path.exists(out_dir):

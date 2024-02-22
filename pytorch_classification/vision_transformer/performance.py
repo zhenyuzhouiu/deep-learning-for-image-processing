@@ -74,17 +74,19 @@ def matching_scores(args, model, test_loader, probe_sample, device):
     cos_similarity = num / norm
     cos_similarity[np.isneginf(cos_similarity)] = 0
     cos_similarity = 0.5 + 0.5 * cos_similarity  # range from [0, 1]
+    
+    if args.protocol == "one_session":
+        # delete diagonal elements for genuine scores
+        g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
+        g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
+        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+    elif args.protocol == "two_session":
+        # all elements
+        g_scores = cos_similarity[:, :probe_sample].reshape(-1)
+        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
 
-    # upright
-    g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
-
-    # delete diagonal elements
-    # g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
-    # g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
-
-    # all elements
-    # g_scores = cos_similarity[:, :probe_sample].reshape(-1)
-    i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+    # # upright
+    # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
 
     return g_scores, i_scores
 
@@ -154,7 +156,7 @@ def main(args, out_dir):
                                                          args.batch_size, args.num_workers, args.protocol,
                                                          visited_subject=visited_subject)
         g_scores_e, i_scores_e = matching_scores(args, model, test_loader, probe_sample, device)
-        visited_subject.append(subject)
+        # visited_subject.append(subject)
         if g_scores_e is not None and i_scores_e is not None:
             g_scores = g_scores_e if g_scores is None else np.concatenate((g_scores, g_scores_e))
             i_scores = i_scores_e if i_scores is None else np.concatenate((i_scores, i_scores_e))

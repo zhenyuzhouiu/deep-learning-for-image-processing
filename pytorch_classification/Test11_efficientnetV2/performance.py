@@ -79,18 +79,20 @@ def matching_scores(args, model, test_loader, probe_sample, device):
     cos_similarity[np.isneginf(cos_similarity)] = 0
     cos_similarity = 0.5 + 0.5 * cos_similarity  # range from [0, 1]
 
-    # upright
-    g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
+    if args.protocol == "one_session":
+        # delete diagonal elements for genuine scores
+        g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
+        g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
+        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
+    elif args.protocol == "two_session":
+        # all elements
+        g_scores = cos_similarity[:, :probe_sample].reshape(-1)
+        i_scores = cos_similarity[:, probe_sample:].reshape(-1)
 
-    # delete diagonal elements
-    # g_scores = np.ndarray.flatten(cos_similarity[:, :probe_sample])
-    # g_scores = np.delete(g_scores, range(0, len(g_scores), probe_sample+1), 0)  # delete diagonal elements
+    # # upright
+    # g_scores = cos_similarity[:, :probe_sample][np.triu_indices_from(cos_similarity[:, :probe_sample], k=1)].reshape(-1)
 
-    # all elements
-    # g_scores = cos_similarity[:, :probe_sample].reshape(-1)
-    i_scores = cos_similarity[:, probe_sample:].reshape(-1)
-
-    return g_scores, i_scores
+    return g_scores, i_scores   
 
 
 def tar_far(g_socres, i_scores, step=1000):

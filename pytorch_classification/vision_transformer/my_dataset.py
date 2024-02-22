@@ -120,13 +120,13 @@ class MyDataSetTest(Dataset):
         probe_sample_n, gallery_sample_n = 0, 0
         list_probe, list_gallery = [], []
         if self.protocol == "one_session":
-            list_subject = os.listdir(self.data_path)
+            list_subject = [f for f in os.listdir(self.data_path) if not f.startswith('.')]
             list_subject.sort()
             # delete visited subject
             for i in range(len(self.visited_subject)):
                 list_subject.remove(self.visited_subject[i])
             for subject in list_subject:
-                list_file = os.listdir(os.path.join(self.data_path, subject))
+                list_file = [f for f in os.listdir(os.path.join(self.data_path, subject)) if not f.startswith('.')]
                 list_file.sort()
                 if subject == self.probe_subject:
                     probe_sample_n += len(list_file)
@@ -143,7 +143,7 @@ class MyDataSetTest(Dataset):
             for i in range(len(self.visited_subject)):
                 list_subject.remove(self.visited_subject[i])
             for subject in list_subject:
-                list_file = os.listdir(os.path.join(self.data_path, subject))
+                list_file = [f for f in os.listdir(os.path.join(self.data_path, subject)) if not f.startswith('.')]
                 list_file.sort()
 
                 if subject == self.probe_subject:
